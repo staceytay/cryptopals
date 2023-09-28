@@ -1,9 +1,12 @@
-use base64::{engine::general_purpose, Engine as _};
 use std::num::ParseIntError;
 
 fn main() {
-    let hex = String::from("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d");
-    println!("{}", hex_to_base64(&hex));
+    let hex = String::from("1c0111001f010100061a024b53535009181c");
+    let buf = String::from("686974207468652062756c6c277320657965");
+    println!(
+        "{:02X?}",
+        fixed_xor(&decode_hex(&hex).unwrap(), &decode_hex(&buf).unwrap())
+    );
 }
 
 // From https://stackoverflow.com/questions/52987181/how-can-i-convert-a-hex-string-to-a-u8-slice.
@@ -14,6 +17,9 @@ fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
         .collect()
 }
 
-fn hex_to_base64(hex: &str) -> String {
-    general_purpose::STANDARD.encode(decode_hex(&hex).unwrap())
+fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
+    b1.into_iter()
+        .zip(b2.into_iter())
+        .map(|(u1, u2)| u1 ^ u2)
+        .collect()
 }
