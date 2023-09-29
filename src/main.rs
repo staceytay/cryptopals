@@ -333,9 +333,9 @@ const CHARS: &'static str = "ETAOIN SHRDLU";
 
 fn main() {
     for (i, line) in FILE.lines().enumerate() {
-        println!("{:03}: {}", i, line);
         let bts = decode_hex(line).unwrap();
 
+        // Get most frequently appearing byte as before.
         let mut counts = HashMap::new();
         for b in bts.iter() {
             *counts.entry(b).or_insert(0) += 1;
@@ -343,6 +343,8 @@ fn main() {
 
         let frequentest = counts.iter().max_by_key(|(_, v)| *v).unwrap();
 
+        // No point considering "most frequent" characters that actually only
+        // appear once.
         if *frequentest.1 > 1 {
             for c in CHARS.chars() {
                 let key = c as u8 ^ **frequentest.0;
@@ -352,12 +354,23 @@ fn main() {
                         .map(|b| b ^ key)
                         .collect::<Vec<u8>>()[..],
                 );
-                if decoded.contains(" ") {
-                    println!("  [{}] -> {}", c, decoded);
+
+                // Count most frequently appearing character.
+                let mut counts = HashMap::new();
+                for c in decoded.chars() {
+                    *counts.entry(c).or_insert(0) += 1;
+                }
+                let frequentest = counts.iter().max_by_key(|(_, v)| *v).unwrap();
+
+                // Use this heuristic to see if the string is likely to be the
+                // message. Heuristic: most frequent char in `decoded` should be
+                // from set in `CHARS` and there should be a space considering
+                // the length of the message.
+                if CHARS.contains(*frequentest.0) && decoded.contains(" ") {
+                    println!("[L{:03}]: [{}] -> {}", i, c, decoded);
                 }
             }
         }
-        print!("-----\n\n");
     }
 }
 
