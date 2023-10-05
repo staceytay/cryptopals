@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use std::collections::HashMap;
 
-const CHARS: &'static str = "ETAOIN SHRDLU";
+const CHARS: &'static str = "ETAOINetaoin SHRDLUshrdlu";
 const FILE: &'static str = include_str!("../6.txt");
 
 fn main() {
@@ -10,124 +10,98 @@ fn main() {
         37
     );
 
-    let hex = general_purpose::STANDARD
+    let bytes = general_purpose::STANDARD
         .decode(FILE.replace('\n', ""))
         .unwrap();
 
-    let sample_size = 2;
-    println!("sample_size = {sample_size}");
-    // Calculate edit distance for each KEYSIZE.
+    // Calculate edit distance for each KEYSIZE averaging over n comparisons.
+    let comparisons = 32;
+    println!("Edit distance (avg) comparing {comparisons} blocks");
     for i in 2..40 {
         let mut sum = 0.0;
-        for j in 0..(sample_size * 2) {
+        for j in 0..(comparisons * 2) {
             if j % 2 == 0 {
                 sum += f64::from(edit_distance(
-                    &hex[((j + 0) * i)..((j + 1) * i)],
-                    &hex[((j + 1) * i)..((j + 2) * i)],
+                    &bytes[((j + 0) * i)..((j + 1) * i)],
+                    &bytes[((j + 1) * i)..((j + 2) * i)],
                 )) / i as f64;
             }
         }
 
-        println!("i = {:02}: {}", i, sum / sample_size as f64);
+        println!("KEYSIZE = {:02}: {}", i, sum / comparisons as f64);
     }
+    println!("");
 
-    let keysize = 29; // 2 or 3 or 5 or 29???
+    let keysize = 29; // Based on results above.
     let mut key = vec![0; keysize];
     for i in 0..keysize {
         // Transpose the original cipher text according to our predicted
         // keysize.
-        let cipher: Vec<u8> = hex
+        let cipher: Vec<u8> = bytes
             .iter()
             .enumerate()
             .filter_map(|(j, &b)| if j % keysize == i { Some(b) } else { None })
             .collect();
-        println!("cipher = {}", show(&cipher));
 
-        // Get most frequently appearing byte as before.
-        // let mut counts = HashMap::new();
-        // for b in cipher.iter() {
-        //     *counts.entry(b).or_insert(0) += 1;
-        // }
-        // println!("counts = {:?}", counts);
-
-        // Count the frequency of each letter
+        // Count the frequency of each letter.
         let mut counts = HashMap::new();
         for b in cipher.iter() {
             *counts.entry(b).or_insert(0) += 1;
         }
 
-        // Get a sorted (by field 0 ("count") in reversed order) list of the
-        // most frequently used characters:
+        // Get a sorted (in reversed order) list of the most frequently used
+        // characters. From
+        // https://stackoverflow.com/questions/34555837/sort-hashmap-data-by-value
         let mut counts_vec: Vec<_> = counts.iter().collect();
         counts_vec.sort_by(|a, b| b.1.cmp(a.1));
-        println!("counts = {:?}", counts_vec);
-        // println!("counts 2 = {:?}", counts_vec[2].0);
 
-        for j in 0..3 {
-            for c in CHARS.chars() {
-                let k = c as u8 ^ **counts_vec[j].0;
-                // println!("i = {i}, c = {c}, k = {k}");
-                let message = &cipher
-                    .clone()
-                    .into_iter()
-                    .map(|b| b ^ k)
-                    .collect::<Vec<u8>>()[..];
-                let decoded = show(message);
-                // println!("decoded = {}", decoded);
-                //---
-                // Count most frequently appearing character.
-                let mut counts = HashMap::new();
-                for c in decoded.chars() {
-                    *counts.entry(c).or_insert(0) += 1;
-                }
-                let frequentest = counts.iter().max_by_key(|(_, v)| *v).unwrap();
+        // Store our best guess at which key is the one. First value is the sum
+        // of occurences of the letters of the alphabet (in both lower and
+        // uppercase) and the space char. Second value is the corresponding key.
+        let mut best_guess = (0.0, 0);
+        for c in CHARS.chars() {
+            let k = c as u8 ^ **counts_vec[0].0;
+            let message = &cipher
+                .clone()
+                .into_iter()
+                .map(|b| b ^ k)
+                .collect::<Vec<u8>>()[..];
 
-                if i == 19 {
-                    println!("[i = {:02}]: [{}] -> {}", i, k, decoded);
-                    key[i] = 32; // Cheated and saw output earlier.
-                }
-                // Use this heuristic to see if the string is likely to be the
-                // message. Heuristic: most frequent char in `decoded` should be
-                // from set in `CHARS` and there should be a space considering
-                // the length of the message.
-                else if CHARS.contains(*frequentest.0) && decoded.contains(" ") {
-                    println!("[i = {:02}]: [{}] -> {}", i, k, decoded);
-                    key[i] = k;
-                }
-                //---
+            // Count freq of each ASCII char appearing.
+            let mut freq = HashMap::new();
+            for b in message.iter() {
+                *freq.entry(b).or_insert(0.0) += 1.0;
+            }
 
-                // Count most frequently appearing character.
-                let mut counts = HashMap::new();
-                for b in message.iter() {
-                    *counts.entry(b).or_insert(0.0) += 1.0;
+            for (_, v) in freq.iter_mut() {
+                *v /= cipher.len() as f64;
+            }
+            let mut sum_occurences = 0.0;
+            for i in 32..=122 {
+                // If i is either the space char or a letter of the
+                // alphabet(-ish).
+                if i == 32 || i > 64 {
+                    match freq.get(&i) {
+                        Some(v) => sum_occurences += v,
+                        None => (),
+                    }
                 }
-                // println!("counts = {:?}", counts);
+            }
 
-                for (_, v) in counts.iter_mut() {
-                    *v /= cipher.len() as f64;
-                }
-                for i in 65..=122 {
-                    // match counts.get(&i) {
-                    //     Some(v) => println!("{}: {:.3}", i as char, v),
-                    //     None => println!("{}: 0", i as char),
-                    // }
-                    // std::ascii::escape_default(b)
-                }
-                // for (k, v) in &counts {
-                //     println!("{} => {:.3}", k, v);
-                // }
-                // println!("counts = {:?}", counts);
+            // At least 80% of characters should be letters of the alphabet or
+            // space.
+            if sum_occurences > 0.8 && sum_occurences > best_guess.0 {
+                best_guess.0 = sum_occurences;
+                best_guess.1 = k;
             }
         }
+        key[i] = best_guess.1;
     }
-    println!("key = {:?}", key);
-
-    // let kblock = []
-    // for i in 0..keysize {
-
-    // }
-    let message = repeat_xor(&key, &hex);
-    println!("{}", show(&message));
+    println!("{:-^64}", "KEY");
+    println!("{}", show(&key));
+    let message = repeat_xor(&key, &bytes);
+    println!("{:-^64}", "MESSAGE");
+    println!("{}", String::from_utf8_lossy(&message));
 }
 
 fn edit_distance(b1: &[u8], b2: &[u8]) -> u32 {
