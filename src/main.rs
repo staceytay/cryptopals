@@ -1,44 +1,41 @@
 use aes::cipher::{
     generic_array::{typenum::U16, GenericArray},
-    BlockEncrypt, KeyInit,
+    BlockDecrypt, BlockEncrypt, KeyInit,
 };
 use aes::Aes128;
+use base64::{engine::general_purpose, Engine as _};
 
 const IV: [u8; 16] = [0u8; 16];
-const FILE: &'static str = include_str!("../7.txt");
+const FILE: &'static str = include_str!("../10.txt");
 const KEY: &'static [u8; 16] = b"YELLOW SUBMARINE";
 
 fn main() {
-    let ciphertext = cbc_encrypt(KEY, FILE.as_bytes());
+    let ciphertext = general_purpose::STANDARD
+        .decode(FILE.replace("\n", ""))
+        .unwrap();
+    let message = cbc_decrypt(&IV, KEY, &ciphertext);
 
-    println!("{:-^64}", "CIPHERTEXT");
-    println!("{}", show(&ciphertext));
+    println!("{:-^64}", "MESSAGE");
+    println!("{}", String::from_utf8(message).unwrap());
 }
 
-fn cbc_encrypt(key: &[u8], bytes: &[u8]) -> Vec<u8> {
+fn cbc_decrypt(iv: &[u8], key: &[u8], bytes: &[u8]) -> Vec<u8> {
     let key = GenericArray::<u8, U16>::clone_from_slice(key);
     let cipher = Aes128::new(&key);
 
     let block_size = 16;
-    let mut ciphertext = Vec::new();
-    let mut previous_block = IV.clone();
+    let mut message = Vec::new();
+    let mut previous_block = iv;
 
     let mut iter = bytes.chunks(block_size).peekable();
     while let Some(chunk) = iter.next() {
-        let mut chunk: Vec<u8> = chunk.to_vec();
-        if iter.peek().is_none() {
-            chunk = pkcs7pad(&chunk, block_size);
-        }
-        let message_block = fixed_xor(&previous_block, &chunk);
-        let mut block = GenericArray::<u8, U16>::clone_from_slice(&message_block);
-        cipher.encrypt_block(&mut block);
-        previous_block = block
-            .as_slice()
-            .try_into()
-            .expect("unexpected block length");
-        ciphertext.extend(block);
+        let mut block = GenericArray::<u8, U16>::clone_from_slice(&chunk);
+        cipher.decrypt_block(&mut block);
+        let message_block = fixed_xor(&previous_block, &block);
+        previous_block = chunk.try_into().expect("unexpected chunk length");
+        message.extend(message_block);
     }
-    ciphertext
+    message
 }
 
 fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
@@ -52,14 +49,4 @@ fn pkcs7pad(block: &[u8], length: usize) -> Vec<u8> {
     let mut padded = Vec::from(block);
     padded.resize(length, (length - block.len()) as u8);
     padded
-}
-
-// From https://stackoverflow.com/questions/41449708/how-to-print-a-u8-slice-as-text-if-i-dont-care-about-the-particular-encoding.
-fn show(bs: &[u8]) -> String {
-    let mut visible = String::new();
-    for &b in bs {
-        let part: Vec<u8> = std::ascii::escape_default(b).collect();
-        visible.push_str(std::str::from_utf8(&part).unwrap());
-    }
-    visible
 }
