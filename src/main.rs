@@ -3,61 +3,89 @@ use aes::cipher::{
     BlockEncrypt, KeyInit,
 };
 use aes::Aes128;
+use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
+use std::collections::HashMap;
+
+const UNKNOWN_STRING: &'static str = include_str!("../12.txt");
 
 fn main() {
-    let ciphertext = encryption_oracle(&vec![64u8; 512]);
-    for chunk in ciphertext.chunks(16) {
-        println!("{:2x?}", chunk);
-    }
-
-    let comparisons = 10;
-    let mut sum = 0.0;
-    for j in 0..(comparisons * 2) {
-        if j % 2 == 0 {
-            sum += f64::from(edit_distance(
-                &ciphertext[((j + 0) * 16)..((j + 1) * 16)],
-                &ciphertext[((j + 1) * 16)..((j + 2) * 16)],
-            )) / 16 as f64;
-        }
-    }
-
-    println!("{:-^64}", "Detected");
-    if (sum / comparisons as f64) < 1.0 {
-        println!("ECB");
-    } else {
-        println!("CBC");
-    }
-    println!("{:-^64}", "");
-}
-
-fn encryption_oracle(input: &[u8]) -> Vec<u8> {
-    let prefix_count = rand::thread_rng().gen_range(5..=10);
-    let suffix_count = rand::thread_rng().gen_range(5..=10);
-
-    let message = [
-        generate_random_bytes(prefix_count),
-        Vec::from(input),
-        generate_random_bytes(suffix_count),
-    ]
-    .concat();
-
-    let ciphertext;
-    println!("{:-^64}", "Using");
-    if rand::thread_rng().gen_range(0..2) == 0 {
-        println!("ECB");
-        ciphertext = ecb_encrypt(&message);
-    } else {
-        println!("CBC");
-        ciphertext = cbc_encrypt(&message);
-    }
-    println!("{:-^64}", "");
-    ciphertext
-}
-
-fn ecb_encrypt(bytes: &[u8]) -> Vec<u8> {
     let key = generate_random_bytes(16);
-    let key = GenericArray::<u8, U16>::clone_from_slice(&key);
+
+    // Step 1: Find block size of the cipher.
+    let block_size = find_block_size(&key).expect("block size to be found");
+
+    // Step 2: Check if function is using ECB.
+    // TODO
+
+    // Steps 3 - 6.
+    let mut message = Vec::new();
+    let block_count = encryption_oracle(b"", &key).len() / block_size;
+    let mut input: Vec<u8> = (0..block_size).into_iter().map(|_| b'A').collect();
+    for bc in 0..block_count {
+        for i in 0..block_size {
+            // input_block[block_size - target_position]
+
+            // Step 4: Create dictionary of every possible last byte.
+            let mut map = HashMap::new();
+            for ascii_code in 0..=127 {
+                let mut input_block = input.clone();
+                input_block[block_size - 1] = ascii_code;
+
+                // println!("Step 4: input = {:?}", input_block);
+                let ciphertext = encryption_oracle(&input_block, &key);
+
+                // println!(
+                //     "Step 4: inserting for {} = {:?}",
+                //     ascii_code,
+                //     ciphertext[0..block_size].to_vec()
+                // );
+                map.insert(ciphertext[0..block_size].to_vec(), ascii_code);
+            }
+            println!("MAP: map = {:?}", map);
+
+            // Step 5: Attempt to match output of one-byte-short input, byte by byte.
+            println!("Step 5: input = {:?}", input);
+            // println!(
+            //     "Step 5: to EO = {:?}",
+            //     &input[input_start_position..block_size]
+            // );
+            let output_block =
+                &encryption_oracle(&input[0..block_size - i - 1], &key)[0..block_size];
+
+            println!("Step 5: output_block = {:?}", output_block);
+            let guess = *(map.get(output_block).unwrap());
+            println!("GUESS: {}", guess);
+            message.push(guess);
+
+            // Step 6: Prepare to repeat for next char.
+            input[block_size - 1] = guess;
+            input.rotate_left(1);
+            println!("INPUT_BLOCK: {}", String::from_utf8(input.clone()).unwrap());
+            // break;
+        }
+        break;
+    }
+
+    println!("MESSAGE: {:?}", String::from_utf8(message).unwrap());
+}
+
+fn encryption_oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
+    println!(
+        "EO: length = {}, {:?}",
+        input.len(),
+        String::from_utf8(input.to_vec()).unwrap()
+    );
+    let unknown = general_purpose::STANDARD
+        .decode(UNKNOWN_STRING.replace("\n", ""))
+        .unwrap();
+    let message = [Vec::from(input), unknown].concat();
+
+    ecb_encrypt(&message, &key)
+}
+
+fn ecb_encrypt(bytes: &[u8], key: &[u8]) -> Vec<u8> {
+    let key = GenericArray::<u8, U16>::clone_from_slice(key);
 
     let cipher = Aes128::new(&key);
 
@@ -109,6 +137,24 @@ fn cbc_encrypt(bytes: &[u8]) -> Vec<u8> {
         }
     }
     ciphertext
+}
+
+fn find_block_size(key: &[u8]) -> Option<usize> {
+    let mut block_size = None;
+    let mut last_length = None;
+    for i in 1..=16 {
+        let ciphertext = encryption_oracle("A".repeat(i).as_bytes(), &key);
+
+        match last_length {
+            None => last_length = Some(ciphertext.len()),
+            Some(length) if ciphertext.len() > length => {
+                block_size = Some(ciphertext.len() - length);
+                break;
+            }
+            Some(_) => last_length = Some(ciphertext.len()),
+        }
+    }
+    block_size
 }
 
 fn generate_random_bytes(length: usize) -> Vec<u8> {
