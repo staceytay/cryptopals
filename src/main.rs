@@ -42,7 +42,7 @@ fn main() {
                 // );
                 map.insert(ciphertext[0..block_size].to_vec(), ascii_code);
             }
-            println!("MAP: map = {:?}", map);
+            // println!("MAP: map = {:?}", map);
 
             // Step 5: Attempt to match output of one-byte-short input, byte by byte.
             println!("Step 5: input = {:?}", input);
@@ -50,13 +50,17 @@ fn main() {
             //     "Step 5: to EO = {:?}",
             //     &input[input_start_position..block_size]
             // );
-            let output_block =
-                &encryption_oracle(&input[0..block_size - i - 1], &key)[0..block_size];
+            let output_block = &encryption_oracle(&input[0..block_size - i - 1], &key)
+                [(bc * block_size)..((bc + 1) * block_size)];
 
             println!("Step 5: output_block = {:?}", output_block);
             let guess = *(map.get(output_block).unwrap());
             println!("GUESS: {}", guess);
             message.push(guess);
+
+            if guess < 10 {
+                break;
+            }
 
             // Step 6: Prepare to repeat for next char.
             input[block_size - 1] = guess;
@@ -64,18 +68,18 @@ fn main() {
             println!("INPUT_BLOCK: {}", String::from_utf8(input.clone()).unwrap());
             // break;
         }
-        break;
+        // break;
     }
 
     println!("MESSAGE: {:?}", String::from_utf8(message).unwrap());
 }
 
 fn encryption_oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
-    println!(
-        "EO: length = {}, {:?}",
-        input.len(),
-        String::from_utf8(input.to_vec()).unwrap()
-    );
+    // println!(
+    //     "EO: length = {}, {:?}",
+    //     input.len(),
+    //     String::from_utf8(input.to_vec()).unwrap()
+    // );
     let unknown = general_purpose::STANDARD
         .decode(UNKNOWN_STRING.replace("\n", ""))
         .unwrap();
