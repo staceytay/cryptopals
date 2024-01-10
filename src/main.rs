@@ -18,68 +18,48 @@ fn main() {
     // Step 2: Check if function is using ECB.
     // TODO
 
-    // Steps 3 - 6.
-    let mut message = Vec::new();
+    // Steps 3 - 6: Attempt to break unknown string.
     let block_count = encryption_oracle(b"", &key).len() / block_size;
     let mut input: Vec<u8> = (0..block_size).into_iter().map(|_| b'A').collect();
-    for bc in 0..block_count {
+    let mut message = Vec::new();
+    for block in 0..block_count {
         for i in 0..block_size {
-            // input_block[block_size - target_position]
-
-            // Step 4: Create dictionary of every possible last byte.
+            // Step 4: Create dictionary for every possible last byte.
             let mut map = HashMap::new();
+            let mut input_block = input.clone();
             for ascii_code in 0..=127 {
-                let mut input_block = input.clone();
                 input_block[block_size - 1] = ascii_code;
-
-                // println!("Step 4: input = {:?}", input_block);
                 let ciphertext = encryption_oracle(&input_block, &key);
-
-                // println!(
-                //     "Step 4: inserting for {} = {:?}",
-                //     ascii_code,
-                //     ciphertext[0..block_size].to_vec()
-                // );
-                map.insert(ciphertext[0..block_size].to_vec(), ascii_code);
+                let first_block = &ciphertext[0..block_size];
+                map.insert(first_block.to_vec(), ascii_code);
             }
-            // println!("MAP: map = {:?}", map);
 
-            // Step 5: Attempt to match output of one-byte-short input, byte by byte.
-            println!("Step 5: input = {:?}", input);
-            // println!(
-            //     "Step 5: to EO = {:?}",
-            //     &input[input_start_position..block_size]
-            // );
-            let output_block = &encryption_oracle(&input[0..block_size - i - 1], &key)
-                [(bc * block_size)..((bc + 1) * block_size)];
+            // Step 5: Attempt to match output to one of the dict entries above.
+            let crafted_input = &input[0..block_size - i - 1];
+            let ciphertext = encryption_oracle(crafted_input, &key);
+            let target_block = &ciphertext[(block * block_size)..((block + 1) * block_size)];
+            let ascii_code = *(map.get(target_block).expect("to match an ascii code"));
+            message.push(ascii_code);
 
-            println!("Step 5: output_block = {:?}", output_block);
-            let guess = *(map.get(output_block).unwrap());
-            println!("GUESS: {}", guess);
-            message.push(guess);
-
-            if guess < 10 {
+            // End condition: stop once we get what seems like a padding char.
+            if ascii_code < 10 {
                 break;
             }
 
-            // Step 6: Prepare to repeat for next char.
-            input[block_size - 1] = guess;
+            // Step 6: Prepare to repeat for next char. Append the matching
+            // ascii code and rotate the contents of input left to "match" the
+            // first i bytes of the target block.
+            input[block_size - 1] = ascii_code;
             input.rotate_left(1);
-            println!("INPUT_BLOCK: {}", String::from_utf8(input.clone()).unwrap());
-            // break;
         }
-        // break;
     }
 
-    println!("MESSAGE: {:?}", String::from_utf8(message).unwrap());
+    println!("{:-^64}", "MESSAGE");
+    println!("{}", String::from_utf8(message).unwrap());
+    println!("{:-^64}", "END");
 }
 
 fn encryption_oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
-    // println!(
-    //     "EO: length = {}, {:?}",
-    //     input.len(),
-    //     String::from_utf8(input.to_vec()).unwrap()
-    // );
     let unknown = general_purpose::STANDARD
         .decode(UNKNOWN_STRING.replace("\n", ""))
         .unwrap();
