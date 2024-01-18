@@ -19,8 +19,63 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 10. [Implement CBC mode](https://cryptopals.com/sets/2/challenges/10) ([solution](https://github.com/staceytay/cryptopals/blob/8a29ff8ecfcf2145952cc727083fb5f66ebd4f45/src/main.rs))
 11. [An ECB/CBC detection oracle](https://cryptopals.com/sets/2/challenges/11) ([solution](https://github.com/staceytay/cryptopals/blob/d0beb87753a020575c0f41753812e5199d328657/src/main.rs))
 12. [Byte-at-a-time ECB decryption (Simple)](https://cryptopals.com/sets/2/challenges/12) ([solution](https://github.com/staceytay/cryptopals/blob/9364b4326c3839fb003e13d785053c7f45267a/src/main.rs))
-13. [ECB cut-and-paste](https://cryptopals.com/sets/2/challenges/13)
+13. [ECB cut-and-paste](https://cryptopals.com/sets/2/challenges/13) ([notes](https://github.com/staceytay/cryptopals/tree/main#set-2-challenge-13)) ([solution](https://github.com/staceytay/cryptopals/blob/7669e1e3f0dce043f48d04afec1edf91cbeb62cb/src/main.rs))
 14. [Byte-at-a-time ECB decryption (Harder)](https://cryptopals.com/sets/2/challenges/14)
 15. [PKCS#7 padding validation](https://cryptopals.com/sets/2/challenges/15)
 16. [CBC bitflipping attacks](https://cryptopals.com/sets/2/challenges/16)
 
+## Notes (spoiler alert!)
+
+### Set 2 Challenge 13
+This attack relies on crafting an input such that we'd be able to get the
+desired ciphertext containing the text "role=admin". (In retrospect, the title
+of the problem is quite a giveaway.)
+
+The first email validation function I wrote only allowed alphanumeric characters
+and the `@` and `.` characters. Based on a closer reading of the problem
+statement, I then changed it to only remove `&` and `=`, allowing for injecting
+the padding characters. Since this didn't seem too realistic for a real world
+email validation function, I was unsure if this was the best approach. But after
+discussing it with some other Recurse folks working on cryptopals, it seems to
+be the only approach we can think of (so far!).
+
+One cool thing that I did learn from this is that emails can contain some special
+characters! From Wikipedia's [page](https://en.wikipedia.org/wiki/Email_address)
+on email addresses:
+> If quoted, it may contain Space, Horizontal Tab (HT), any ASCII graphic except
+> Backslash and Quote and a quoted-pair consisting of a Backslash followed by
+> HT, Space or any ASCII graphic; it may also be split between lines anywhere
+> that HT or Space appears. 
+
+So I know that at least the ascii code 9 (HT) is allowed, but unfortunately the
+padding code that I'd need for this attack is 11 and I can't find anything
+definitive on its validity from the wiki page or from [RFC5322: Internet Message
+Format](https://datatracker.ietf.org/doc/html/rfc5322#section-3.2.3).
+
+``` rust
+let ciphertext = [
+    // The chosen input here would produce a ciphertext with three blocks
+    // and the last block would be
+    // "user\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}".
+    // We take the first two blocks of this ciphertext.
+    &ecb_encrypt(profile_for("admin@bar.com").as_bytes(), &key)[..32],
+    // The chosen input here would produce a ciphertext with the second
+    // block being
+    // "admin\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}". We
+    // append this block to the previous two blocks above to form our
+    // desired role=admin profile.
+    &ecb_encrypt(
+        profile_for(
+            "1234567890admin\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}",
+        )
+        .as_bytes(),
+        &key,
+    )[16..32],
+]
+.concat();
+
+assert_eq!(
+    "email=admin@bar.com&uid=10&role=admin",
+    String::from_utf8(ecb_decrypt(&ciphertext, &key)).unwrap()
+);
+```
