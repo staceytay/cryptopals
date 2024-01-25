@@ -1,88 +1,71 @@
 use aes::cipher::{
     generic_array::{typenum::U16, GenericArray},
-    BlockDecrypt, BlockEncrypt, KeyInit,
+    BlockEncrypt, KeyInit,
 };
 use aes::Aes128;
+use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use std::collections::HashMap;
-use url::Url;
+
+const UNKNOWN_STRING: &'static str = include_str!("../12.txt");
 
 fn main() {
     let key = generate_random_bytes(16);
 
-    let encoded = "foo=bar&baz=qux&zap=zazzle";
-    println!("{:?}", decode(encoded));
+    // Step 1: Find block size of the cipher.
+    let block_size = find_block_size(&key).expect("block size to be found");
 
-    let example_encoded = "email=abc@email.com&uid=10&role=user";
+    // Step 2: Check if function is using ECB.
+    // TODO
 
-    assert_eq!(example_encoded, profile_for("&=abc&@email.com"));
-    assert_eq!(
-        example_encoded,
-        String::from_utf8(ecb_decrypt(
-            &ecb_encrypt(profile_for("abc@email.com").as_bytes(), &key),
-            &key
-        ))
-        .unwrap()
-    );
-
-    let ciphertext = [
-        // The chosen input here would produce a ciphertext with three blocks
-        // and the last block would be
-        // "user\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}\u{c}".
-        // We take the first two blocks of this ciphertext.
-        &ecb_encrypt(profile_for("admin@bar.com").as_bytes(), &key)[..32],
-        // The chosen input here would produce a ciphertext with the second
-        // block being
-        // "admin\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}". We
-        // append this block to the previous two blocks above to form our
-        // desired role=admin profile.
-        &ecb_encrypt(
-            profile_for(
-                "1234567890admin\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}",
-            )
-            .as_bytes(),
-            &key,
-        )[16..32],
-    ]
-    .concat();
-
-    assert_eq!(
-        "email=admin@bar.com&uid=10&role=admin",
-        String::from_utf8(ecb_decrypt(&ciphertext, &key)).unwrap()
-    );
-}
-
-fn decode(encoded: &str) -> HashMap<String, String> {
-    // Use url just to leverage the query string parsing code.
-    let url = Url::parse(&format!("https://example.net?{}", encoded)).unwrap();
-    let map: HashMap<_, _> = url.query_pairs().into_owned().collect();
-    map
-}
-
-fn profile_for(email: &str) -> String {
-    let validated_email: String = email.chars().filter(|c| !"&=".contains(*c)).collect();
-    format!("email={}&uid=10&role=user", validated_email)
-}
-
-fn ecb_decrypt(bytes: &[u8], key: &[u8]) -> Vec<u8> {
-    let key = GenericArray::<u8, U16>::clone_from_slice(key);
-    let cipher = Aes128::new(&key);
-
-    let block_size = 16;
+    // Steps 3 - 6: Attempt to break unknown string.
+    let block_count = encryption_oracle(b"", &key).len() / block_size;
+    let mut input: Vec<u8> = (0..block_size).into_iter().map(|_| b'A').collect();
     let mut message = Vec::new();
-    for i in 0..(bytes.len() / block_size) {
-        let mut block = GenericArray::<u8, U16>::clone_from_slice(
-            &bytes[(i * block_size)..((i + 1) * block_size)],
-        );
-        cipher.decrypt_block(&mut block);
-        if block[15] < 16u8 {
-            // Trim off padding for the last block.
-            message.extend(&block[..16 - block[15] as usize])
-        } else {
-            message.extend(block)
+    for block in 0..block_count {
+        for i in 0..block_size {
+            // Step 4: Create dictionary for every possible last byte.
+            let mut map = HashMap::new();
+            let mut input_block = input.clone();
+            for ascii_code in 0..=127 {
+                input_block[block_size - 1] = ascii_code;
+                let ciphertext = encryption_oracle(&input_block, &key);
+                let first_block = &ciphertext[0..block_size];
+                map.insert(first_block.to_vec(), ascii_code);
+            }
+
+            // Step 5: Attempt to match output to one of the dict entries above.
+            let crafted_input = &input[0..block_size - i - 1];
+            let ciphertext = encryption_oracle(crafted_input, &key);
+            let target_block = &ciphertext[(block * block_size)..((block + 1) * block_size)];
+            let ascii_code = *(map.get(target_block).expect("to match an ascii code"));
+            message.push(ascii_code);
+
+            // End condition: stop once we get what seems like a padding char.
+            if ascii_code < 10 {
+                break;
+            }
+
+            // Step 6: Prepare to repeat for next char. Append the matching
+            // ascii code and rotate the contents of input left to "match" the
+            // first i bytes of the target block.
+            input[block_size - 1] = ascii_code;
+            input.rotate_left(1);
         }
     }
-    message
+
+    println!("{:-^64}", "MESSAGE");
+    println!("{}", String::from_utf8(message).unwrap());
+    println!("{:-^64}", "END");
+}
+
+fn encryption_oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
+    let unknown = general_purpose::STANDARD
+        .decode(UNKNOWN_STRING.replace("\n", ""))
+        .unwrap();
+    let message = [Vec::from(input), unknown].concat();
+
+    ecb_encrypt(&message, &key)
 }
 
 fn ecb_encrypt(bytes: &[u8], key: &[u8]) -> Vec<u8> {
@@ -108,6 +91,24 @@ fn ecb_encrypt(bytes: &[u8], key: &[u8]) -> Vec<u8> {
         }
     }
     ciphertext
+}
+
+fn find_block_size(key: &[u8]) -> Option<usize> {
+    let mut block_size = None;
+    let mut last_length = None;
+    for i in 1..=16 {
+        let ciphertext = encryption_oracle("A".repeat(i).as_bytes(), &key);
+
+        match last_length {
+            None => last_length = Some(ciphertext.len()),
+            Some(length) if ciphertext.len() > length => {
+                block_size = Some(ciphertext.len() - length);
+                break;
+            }
+            Some(_) => last_length = Some(ciphertext.len()),
+        }
+    }
+    block_size
 }
 
 fn generate_random_bytes(length: usize) -> Vec<u8> {
