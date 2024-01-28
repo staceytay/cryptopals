@@ -7,20 +7,21 @@ use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use std::collections::HashMap;
 
+const KEY_LENGTH: usize = 16;
 const UNKNOWN_STRING: &'static str = include_str!("../12.txt");
 
 fn main() {
-    let key = generate_random_bytes(16);
+    let oracle = Oracle::new();
 
     // Step 1: Find block size of the cipher.
-    let block_size = find_block_size(&key).expect("block size to be found");
+    let block_size = find_block_size(&oracle).expect("block size to be found");
     println!("block_size: {block_size}");
 
-    // Step 2: TODO: Check if function is using ECB.
+    // Step 2 (skipped): Check if function is using ECB.
 
     // Find length of random prefix.
-    let ciphertext_a = encryption_oracle(b"A", &key);
-    let ciphertext_b = encryption_oracle(b"B", &key);
+    let ciphertext_a = oracle.encrypt(b"A");
+    let ciphertext_b = oracle.encrypt(b"B");
     let block_pairs = ciphertext_a
         .chunks(block_size)
         .zip(ciphertext_b.chunks(block_size));
@@ -36,7 +37,7 @@ fn main() {
     let mut padding_count = 0;
     let mut last_block = None;
     for i in 1..=16 {
-        let ciphertext = encryption_oracle("A".repeat(i).as_bytes(), &key);
+        let ciphertext = oracle.encrypt("A".repeat(i).as_bytes());
 
         match last_block {
             None => {
@@ -62,34 +63,38 @@ fn main() {
         }
     }
     println!("padding_count = {padding_count}");
-    let padding = b"A".repeat(padding_count);
+    let padding = vec![0u8; padding_count];
 
     // Steps 3 - 6: Attempt to break unknown string.
     // TODO: feed char into oracle until the first block returned doesn't
     // change, indicating that the number of chars filled should be the prefix
     // "padding". Subsequently pad with these characters and continue with algo
     // as in challenge 12
-    let total_block_count = encryption_oracle(&padding, &key).len() / block_size;
-    let random_prefix_block_count = block_position + 1;
+    let total_block_count = oracle.encrypt(&padding).len() / block_size;
+    let offset_blocks = if padding_count == 0 {
+        block_position
+    } else {
+        block_position + 1
+    };
     let mut input: Vec<u8> = (0..block_size).into_iter().map(|_| b'A').collect();
     let mut message = Vec::new();
-    for block in random_prefix_block_count..total_block_count {
+    for block in offset_blocks..total_block_count {
         for i in 0..block_size {
             // Step 4: Create dictionary for every possible last byte.
             let mut map = HashMap::new();
-            let mut input_block = input.clone();
+            let mut padded_input = [padding.clone(), input.clone()].concat();
+            let len = padded_input.len();
             for ascii_code in 0..=127 {
-                input_block[block_size - 1] = ascii_code;
-                let ciphertext =
-                    encryption_oracle(&[padding.clone(), input_block.clone()].concat(), &key);
-                let target_block = &ciphertext[random_prefix_block_count * block_size
-                    ..(random_prefix_block_count + 1) * block_size];
+                padded_input[len - 1] = ascii_code;
+                let ciphertext = oracle.encrypt(&padded_input);
+                let target_block =
+                    &ciphertext[offset_blocks * block_size..(offset_blocks + 1) * block_size];
                 map.insert(target_block.to_vec(), ascii_code);
             }
 
             // Step 5: Attempt to match output to one of the dict entries above.
             let crafted_input = &input[0..block_size - i - 1];
-            let ciphertext = encryption_oracle(&[&padding, crafted_input].concat(), &key);
+            let ciphertext = oracle.encrypt(&[&padding, crafted_input].concat());
             let target_block = &ciphertext[(block * block_size)..((block + 1) * block_size)];
             let ascii_code = *(map.get(target_block).expect("to match an ascii code"));
 
@@ -114,25 +119,30 @@ fn main() {
     println!("{:-^64}", "END");
 }
 
-// TODO: explore storing random prefix in a global var first, then later see if
-// there are OOP or "Rust" approaches to this
-fn encryption_oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
-    // let mut rng = rand::thread_rng();
-    // random_prefix = Some(generate_random_bytes(rng.gen::<u8>() as usize));
-    let random_prefix = "random".as_bytes();
+struct Oracle {
+    key: Vec<u8>,
+    random_prefix: Vec<u8>,
+    unknown: Vec<u8>,
+}
 
-    let unknown = general_purpose::STANDARD
-        .decode(UNKNOWN_STRING.replace("\n", ""))
-        .unwrap();
+impl Oracle {
+    fn new() -> Oracle {
+        let mut rng = rand::thread_rng();
+        Oracle {
+            key: generate_random_bytes(KEY_LENGTH),
+            random_prefix: generate_random_bytes(rng.gen::<u8>() as usize),
+            unknown: general_purpose::STANDARD
+                .decode(UNKNOWN_STRING.replace("\n", ""))
+                .unwrap(),
+        }
+    }
 
-    let message = [random_prefix, &Vec::from(input), &unknown].concat();
+    fn encrypt(&self, input: &[u8]) -> Vec<u8> {
+        let message = [&self.random_prefix[..], &Vec::from(input), &self.unknown].concat();
 
-    let ciphertext = ecb_encrypt(&message, &key);
-    // println!("{:-^64}", "CIPHERTEXT");
-    // for chunk in ciphertext.chunks(16) {
-    //     println!("{:2x?}", chunk);
-    // }
-    ciphertext
+        let ciphertext = ecb_encrypt(&message, &self.key);
+        ciphertext
+    }
 }
 
 fn ecb_encrypt(bytes: &[u8], key: &[u8]) -> Vec<u8> {
@@ -160,11 +170,11 @@ fn ecb_encrypt(bytes: &[u8], key: &[u8]) -> Vec<u8> {
     ciphertext
 }
 
-fn find_block_size(key: &[u8]) -> Option<usize> {
+fn find_block_size(oracle: &Oracle) -> Option<usize> {
     let mut block_size = None;
     let mut last_length = None;
     for i in 0..16 {
-        let ciphertext = encryption_oracle("A".repeat(i).as_bytes(), &key);
+        let ciphertext = oracle.encrypt("A".repeat(i).as_bytes());
 
         match last_length {
             None => last_length = Some(ciphertext.len()),
