@@ -15,70 +15,23 @@ fn main() {
 
     // Step 1: Find block size of the cipher.
     let block_size = find_block_size(&oracle).expect("block size to be found");
-    println!("block_size: {block_size}");
 
     // Step 2 (skipped): Check if function is using ECB.
 
-    // Find length of random prefix.
-    let ciphertext_a = oracle.encrypt(b"A");
-    let ciphertext_b = oracle.encrypt(b"B");
-    let block_pairs = ciphertext_a
-        .chunks(block_size)
-        .zip(ciphertext_b.chunks(block_size));
-    let mut block_position = 0;
-    for (i, (block_a, block_b)) in block_pairs.enumerate() {
-        if block_a != block_b {
-            block_position = i;
-            break;
-        }
-    }
-    println!("block_position = {block_position}");
-
-    let mut padding_count = 0;
-    let mut last_block = None;
-    for i in 1..=16 {
-        let ciphertext = oracle.encrypt("A".repeat(i).as_bytes());
-
-        match last_block {
-            None => {
-                last_block = Some(
-                    (&ciphertext[block_position * block_size..(block_position + 1) * block_size])
-                        .to_vec(),
-                )
-            }
-            Some(block) => {
-                if block
-                    == &ciphertext[block_position * block_size..(block_position + 1) * block_size]
-                {
-                    padding_count = i - 1;
-                    break;
-                } else {
-                    last_block = Some(
-                        (&ciphertext
-                            [block_position * block_size..(block_position + 1) * block_size])
-                            .to_vec(),
-                    );
-                }
-            }
-        }
-    }
-    println!("padding_count = {padding_count}");
-    let padding = vec![0u8; padding_count];
-
-    // Steps 3 - 6: Attempt to break unknown string.
-    // TODO: feed char into oracle until the first block returned doesn't
-    // change, indicating that the number of chars filled should be the prefix
-    // "padding". Subsequently pad with these characters and continue with algo
-    // as in challenge 12
-    let total_block_count = oracle.encrypt(&padding).len() / block_size;
-    let offset_blocks = if padding_count == 0 {
-        block_position
+    // Steps 3 - 6: Attempt to break unknown string as in challenge 12, but
+    // taking into account the offset for random prefix and padding.
+    let prefix_length = find_random_prefix_length(&oracle, block_size);
+    let prefix_blocks = if prefix_length % block_size == 0 {
+        prefix_length / block_size
     } else {
-        block_position + 1
+        prefix_length / block_size + 1
     };
+    let padding = vec![0u8; block_size - (prefix_length % block_size)];
+
+    let total_block_count = oracle.encrypt(&padding).len() / block_size;
     let mut input: Vec<u8> = (0..block_size).into_iter().map(|_| b'A').collect();
     let mut message = Vec::new();
-    for block in offset_blocks..total_block_count {
+    for block_count in prefix_blocks..total_block_count {
         for i in 0..block_size {
             // Step 4: Create dictionary for every possible last byte.
             let mut map = HashMap::new();
@@ -87,18 +40,16 @@ fn main() {
             for ascii_code in 0..=127 {
                 padded_input[len - 1] = ascii_code;
                 let ciphertext = oracle.encrypt(&padded_input);
-                let target_block =
-                    &ciphertext[offset_blocks * block_size..(offset_blocks + 1) * block_size];
+                let target_block = block(&ciphertext, prefix_blocks, block_size);
                 map.insert(target_block.to_vec(), ascii_code);
             }
 
             // Step 5: Attempt to match output to one of the dict entries above.
             let crafted_input = &input[0..block_size - i - 1];
             let ciphertext = oracle.encrypt(&[&padding, crafted_input].concat());
-            let target_block = &ciphertext[(block * block_size)..((block + 1) * block_size)];
+            let target_block = block(&ciphertext, block_count, block_size);
             let ascii_code = *(map.get(target_block).expect("to match an ascii code"));
 
-            println!("{block}[{:>2}]: {ascii_code}", i);
             message.push(ascii_code);
 
             // End condition: stop once we get what seems like a padding char.
@@ -188,11 +139,49 @@ fn find_block_size(oracle: &Oracle) -> Option<usize> {
     block_size
 }
 
-// fn find_first_block(ciphertext: &[u8], block_size: usize) -> &[u8] {
-//     for chunk in ciphertext.chunks(block_size) {
-//         println!("{:2x?}", chunk);
-//     }
-// }
+fn find_random_prefix_length(oracle: &Oracle, block_size: usize) -> usize {
+    // Find the number of blocks that corresponds to the random prefix.
+    let ciphertext_a = oracle.encrypt(b"A");
+    let ciphertext_b = oracle.encrypt(b"B");
+    let block_pairs = ciphertext_a
+        .chunks(block_size)
+        .zip(ciphertext_b.chunks(block_size));
+    let mut prefix_blocks = 0;
+    for (i, (block_a, block_b)) in block_pairs.enumerate() {
+        if block_a != block_b {
+            prefix_blocks = i;
+            break;
+        }
+    }
+
+    // Find the exact length of the prefix. To do this, we encrypt an input with
+    // an increasing length of characters, starting from 1. We compare the last
+    // prefix block (position) with the last prefix block from the previous
+    // iteration. If we find two blocks of the same bytes, we know that the
+    // later padding character went past the boundary into the next block in the
+    // ciphertext.  If the prefix blocks are all different across the different
+    // [1, block_size] padding size, then the prefix's length is a multiple of
+    // block_size.
+    let mut padding_count = 0;
+    let mut prev_block = None;
+    for i in 1..=block_size {
+        let ciphertext = oracle.encrypt("A".repeat(i).as_bytes());
+
+        match prev_block {
+            Some(pb) if pb == block(&ciphertext, prefix_blocks, block_size) => {
+                padding_count = i - 1;
+                break;
+            }
+            _ => prev_block = Some(block(&ciphertext, prefix_blocks, block_size).to_vec()),
+        }
+    }
+
+    (prefix_blocks + 1) * block_size - padding_count
+}
+
+fn block(ciphertext: &[u8], prefix_blocks: usize, block_size: usize) -> &[u8] {
+    &ciphertext[prefix_blocks * block_size..(prefix_blocks + 1) * block_size]
+}
 
 fn generate_random_bytes(length: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
