@@ -20,7 +20,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 11. [An ECB/CBC detection oracle](https://cryptopals.com/sets/2/challenges/11) ([solution](https://github.com/staceytay/cryptopals/blob/d0beb87753a020575c0f41753812e5199d328657/src/main.rs))
 12. [Byte-at-a-time ECB decryption (Simple)](https://cryptopals.com/sets/2/challenges/12) ([solution](https://github.com/staceytay/cryptopals/blob/9364b4326c3839fb003e13d785053c7f45267a/src/main.rs))
 13. [ECB cut-and-paste](https://cryptopals.com/sets/2/challenges/13) ([notes](https://github.com/staceytay/cryptopals/tree/main#set-2-challenge-13)) ([solution](https://github.com/staceytay/cryptopals/blob/7669e1e3f0dce043f48d04afec1edf91cbeb62cb/src/main.rs))
-14. [Byte-at-a-time ECB decryption (Harder)](https://cryptopals.com/sets/2/challenges/14)
+14. [Byte-at-a-time ECB decryption (Harder)](https://cryptopals.com/sets/2/challenges/14) ([notes](https://github.com/staceytay/cryptopals#set-2-challenge-14)) ([solution](https://github.com/staceytay/cryptopals/blob/7ede4f76e7a87d97e83b3edf83befef4f14f8223/src/main.rs))
 15. [PKCS#7 padding validation](https://cryptopals.com/sets/2/challenges/15)
 16. [CBC bitflipping attacks](https://cryptopals.com/sets/2/challenges/16)
 
@@ -79,3 +79,15 @@ assert_eq!(
     String::from_utf8(ecb_decrypt(&ciphertext, &key)).unwrap()
 );
 ```
+
+### Set 2 Challenge 14
+> Now generate a random count of random bytes and prepend this string to every
+> plaintext.
+
+At first I misread and mistakenly thought that the random prefix changes with
+each call to the oracle function. That would have made the solution much harder,
+although still possible (I think). Solving for the case when the random prefix
+is fixed makes the problem much more tractable. Solution sketch:
+1. Find the length of the random prefix.
+2. Repeat the steps in challenge 12 but ignoring the first *n* blocks that
+   corresponds to the random prefix when calling the oracle function.
