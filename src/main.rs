@@ -5,7 +5,6 @@ use aes::cipher::{
 use aes::Aes128;
 use rand::Rng;
 
-const IV: [u8; 16] = [0u8; 16];
 const KEY_LENGTH: usize = 16;
 
 fn main() {
@@ -36,12 +35,14 @@ fn main() {
 }
 
 struct Oracle {
+    iv: Vec<u8>,
     key: Vec<u8>,
 }
 
 impl Oracle {
     fn new() -> Oracle {
         Oracle {
+            iv: generate_random_bytes(KEY_LENGTH),
             key: generate_random_bytes(KEY_LENGTH),
         }
     }
@@ -56,14 +57,12 @@ impl Oracle {
         .as_bytes()
         .to_vec();
 
-        let ciphertext = cbc_encrypt(&self.key, &escaped_input);
+        let ciphertext = cbc_encrypt(&self.iv, &self.key, &escaped_input);
         ciphertext
     }
 
     fn decrypt(&self, ciphertext: &[u8]) -> bool {
-        println!("DECRYPT 1 = {}", String::from_utf8_lossy(ciphertext));
-        let message = cbc_decrypt(&IV, &self.key, ciphertext);
-        println!("DECRYPT 2 = {}", String::from_utf8_lossy(&message));
+        let message = cbc_decrypt(&self.iv, &self.key, ciphertext);
         bytes_contain(&message, ";admin=true;".as_bytes())
     }
 }
@@ -105,13 +104,13 @@ fn cbc_decrypt(iv: &[u8], key: &[u8], bytes: &[u8]) -> Vec<u8> {
     message
 }
 
-fn cbc_encrypt(key: &[u8], bytes: &[u8]) -> Vec<u8> {
+fn cbc_encrypt(iv: &[u8], key: &[u8], bytes: &[u8]) -> Vec<u8> {
     let key = GenericArray::<u8, U16>::clone_from_slice(key);
     let cipher = Aes128::new(&key);
 
     let block_size = 16;
     let mut ciphertext = Vec::new();
-    let mut previous_block = IV.clone();
+    let mut previous_block = iv.to_vec();
 
     let mut iter = bytes.chunks(block_size).peekable();
     while let Some(chunk) = iter.next() {
