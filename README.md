@@ -23,6 +23,18 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 14. [Byte-at-a-time ECB decryption (Harder)](https://cryptopals.com/sets/2/challenges/14) ([notes](https://github.com/staceytay/cryptopals#set-2-challenge-14)) ([solution](https://github.com/staceytay/cryptopals/blob/7ede4f76e7a87d97e83b3edf83befef4f14f8223/src/main.rs))
 15. [PKCS#7 padding validation](https://cryptopals.com/sets/2/challenges/15) ([solution](https://github.com/staceytay/cryptopals/blob/b1c2572e4b60c7d847a860fcab13e0a549dedec3/src/main.rs))
 16. [CBC bitflipping attacks](https://cryptopals.com/sets/2/challenges/16) ([solution](https://github.com/staceytay/cryptopals/blob/a9112afc3d79e63f5eb537bb09dc1093aa9cd81f/src/main.rs))
+
+## Set 3: Block & stream crypto
+
+17. [The CBC padding oracle](https://cryptopals.com/sets/3/challenges/17)
+18. [Implement CTR, the stream cipher mode](https://cryptopals.com/sets/3/challenges/18)
+19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19)
+20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20)
+21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21)
+22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22)
+23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23)
+24. [Create the MT19937 stream cipher and break it](https://cryptopals.com/sets/3/challenges/24)
+
 ## Notes (spoiler alert!)
 
 ### Set 2 Challenge 13
