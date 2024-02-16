@@ -22,8 +22,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 13. [ECB cut-and-paste](https://cryptopals.com/sets/2/challenges/13) ([notes](https://github.com/staceytay/cryptopals/tree/main#set-2-challenge-13)) ([solution](https://github.com/staceytay/cryptopals/blob/7669e1e3f0dce043f48d04afec1edf91cbeb62cb/src/main.rs))
 14. [Byte-at-a-time ECB decryption (Harder)](https://cryptopals.com/sets/2/challenges/14) ([notes](https://github.com/staceytay/cryptopals#set-2-challenge-14)) ([solution](https://github.com/staceytay/cryptopals/blob/7ede4f76e7a87d97e83b3edf83befef4f14f8223/src/main.rs))
 15. [PKCS#7 padding validation](https://cryptopals.com/sets/2/challenges/15) ([solution](https://github.com/staceytay/cryptopals/blob/b1c2572e4b60c7d847a860fcab13e0a549dedec3/src/main.rs))
-16. [CBC bitflipping attacks](https://cryptopals.com/sets/2/challenges/16)
-
+16. [CBC bitflipping attacks](https://cryptopals.com/sets/2/challenges/16) ([solution](https://github.com/staceytay/cryptopals/blob/a9112afc3d79e63f5eb537bb09dc1093aa9cd81f/src/main.rs))
 ## Notes (spoiler alert!)
 
 ### Set 2 Challenge 13
