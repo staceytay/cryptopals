@@ -14,92 +14,63 @@ const KEY_LENGTH: usize = 16;
 fn main() {
     let oracle = Oracle::new();
     let (ciphertext, iv) = oracle.encrypt();
-    // println!("{:?}", ciphertext);
-    // println!("{:?}", oracle.decrypt(&ciphertext[0..32], &iv));
 
     let mut plaintext: Vec<u8> = Vec::new();
     for block_index in 0..(ciphertext.len() / BLOCK_SIZE) {
-        // for block_index in 0..1 {
+        // The intermediate block is the block produced right after block
+        // decryption but before being XOR-ed with the IV / previous ciphertext
+        // block.
         let mut intermediate_block = vec![0; BLOCK_SIZE];
         for i in 1..=BLOCK_SIZE {
-            // println!("LOOP bi = {block_index}, i = {i}");
+            // We want to create a tampered block such that passing it in as the
+            // IV block to the decryption function produces a valid padding upon
+            // decryption.
             let mut tampered_block = vec![0; BLOCK_SIZE];
             for j in 1..=i {
                 tampered_block[BLOCK_SIZE - j] = i as u8;
             }
-            // TODO: how to prepare tempered block here to be a zeroing IV?
-
-            // println!(
-            //     "INTERMEDIATE BLOCK: {block_index}: {i}: {:?}",
-            //     intermediate_block
-            // );
-            // println!("TAMPERED BLOCK: {:?}", tampered_block);
             tampered_block = fixed_xor(&tampered_block, &intermediate_block);
-            // println!("TAMPERED BLOCK after XOR: {:?}", tampered_block);
             for code in u8::MIN..=u8::MAX {
                 tampered_block[BLOCK_SIZE - i] = code;
-                // println!("TAMPERED BLOCK with code = {code}: {:?}", tampered_block);
-                let valid = oracle.decrypt(
+                if oracle.decrypt(
                     &ciphertext[block_index * BLOCK_SIZE..(block_index + 1) * BLOCK_SIZE],
                     &tampered_block,
-                );
-                if valid {
-                    // println!("VALID FIRST bi = {block_index}, i = {i}, code = {code}");
+                ) {
+                    // Check an edge case where the decryption produces a valid
+                    // padding for padding length 1 instead of 2.
                     if i == 1 {
                         tampered_block[BLOCK_SIZE - i - 1] = 22u8;
-                        let valid2 = oracle.decrypt(
+                        if !oracle.decrypt(
                             &ciphertext[block_index * BLOCK_SIZE..(block_index + 1) * BLOCK_SIZE],
                             &tampered_block,
-                        );
-                        if valid2 {
-                            // println!("VALID SECOND bi = {block_index}, i = {i}, code = {code}");
-                            // let intermediate_code =
-                            //     i as u8 ^ ciphertext[(block_index * BLOCK_SIZE) + (BLOCK_SIZE - i)];
-                            intermediate_block[BLOCK_SIZE - i] = code ^ i as u8;
-                            break;
+                        ) {
+                            continue;
                         }
-                        tampered_block[BLOCK_SIZE - i - 1] = 0u8;
-                    } else {
-                        // let intermediate_code =
-                        //     i as u8 ^ ciphertext[(block_index * BLOCK_SIZE) + (BLOCK_SIZE - i)];
-                        intermediate_block[BLOCK_SIZE - i] = code ^ i as u8;
-                        break;
                     }
-                    // println!(
-                    //     "INTERMEDIATE BLOCK: {block_index}: {i}: {:?}",
-                    //     intermediate_block
-                    // );
-                    // println!("{:-^64}", "END");
+                    intermediate_block[BLOCK_SIZE - i] = code ^ i as u8;
+                    break;
                 }
             }
-            // println!(
-            //     "INTERMEDIATE BLOCK: {block_index}: {i}: {:?}",
-            //     intermediate_block
-            // );
         }
         let previous_ciphertext_block = if block_index == 0 {
             &iv
         } else {
             &ciphertext[(block_index - 1) * BLOCK_SIZE..block_index * BLOCK_SIZE]
         };
-        let plaintext_block = fixed_xor(previous_ciphertext_block, &intermediate_block);
-        println!("Plaintext BLOCK: {:?}", plaintext_block);
-        plaintext.extend(plaintext_block);
+        plaintext.extend(fixed_xor(previous_ciphertext_block, &intermediate_block));
     }
 
-    println!("{:-^64}", "CIPHERTEXT");
-    println!("{:?}", ciphertext);
-    println!("{:-^64}", "PLAINTEXT");
-    println!("{:?}", plaintext);
-    println!("{:?}", validate_pkcs7pad(&plaintext));
+    println!("{:-^64}", "DECRYPTED PLAINTEXT");
     println!(
         "{}",
-        String::from_utf8_lossy(
-            &general_purpose::STANDARD
+        String::from_utf8(
+            general_purpose::STANDARD
                 .decode(validate_pkcs7pad(&plaintext).unwrap())
                 .unwrap()
         )
+        .unwrap()
     );
+    println!("{:-^64}", "END");
 }
 
 struct Oracle {
@@ -128,27 +99,12 @@ impl Oracle {
         ];
         let selected_string = strings[rand::thread_rng().gen_range(0..strings.len())];
         let iv = generate_random_bytes(KEY_LENGTH);
-        println!("{:-^64}", "SELECTED STRING");
-        println!(
-            "{}",
-            String::from_utf8(
-                general_purpose::STANDARD
-                    .decode(selected_string.replace("\n", ""))
-                    .unwrap()
-            )
-            .unwrap()
-        );
-        println!("{:?}", selected_string.as_bytes());
-        println!("{:-^64}", "END");
-
         let ciphertext = cbc_encrypt(&iv, &self.key, selected_string.as_bytes());
         (ciphertext, iv)
     }
 
     fn decrypt(&self, ciphertext: &[u8], iv: &[u8]) -> bool {
         let message = cbc_decrypt(iv, &self.key, ciphertext);
-        // println!("{:-^64}", "DECRYPTED MESSAGE");
-        // println!("{:?}", message);
         validate_pkcs7pad(&message).is_ok()
     }
 }
