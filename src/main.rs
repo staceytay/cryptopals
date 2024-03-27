@@ -184,13 +184,14 @@ fn cbc_encrypt(iv: &[u8], key: &[u8], bytes: &[u8]) -> Vec<u8> {
     let key = GenericArray::<u8, U16>::clone_from_slice(key);
     let cipher = Aes128::new(&key);
 
+    let padded_bytes = pkcs7pad(bytes);
     let mut ciphertext = Vec::new();
     let mut previous_block = iv.to_vec();
 
-    for block_index in 0..(bytes.len() / BLOCK_SIZE) {
+    for block_index in 0..(padded_bytes.len() / BLOCK_SIZE) {
         let intermediate_block = fixed_xor(
             &previous_block,
-            &bytes[block_index * BLOCK_SIZE..(block_index + 1) * BLOCK_SIZE],
+            &padded_bytes[block_index * BLOCK_SIZE..(block_index + 1) * BLOCK_SIZE],
         );
         let mut block = GenericArray::<u8, U16>::clone_from_slice(&intermediate_block);
         cipher.encrypt_block(&mut block);
@@ -200,39 +201,6 @@ fn cbc_encrypt(iv: &[u8], key: &[u8], bytes: &[u8]) -> Vec<u8> {
             .expect("unexpected block length");
         ciphertext.extend(block);
     }
-
-    let last_block = &bytes[(bytes.len() / BLOCK_SIZE) * BLOCK_SIZE..];
-    let padded_blocks = pkcs7pad(last_block, BLOCK_SIZE);
-    for block_index in 0..(padded_blocks.len() / BLOCK_SIZE) {
-        let intermediate_block = fixed_xor(
-            &previous_block,
-            &padded_blocks[block_index * BLOCK_SIZE..(block_index + 1) * BLOCK_SIZE],
-        );
-        let mut block = GenericArray::<u8, U16>::clone_from_slice(&intermediate_block);
-        cipher.encrypt_block(&mut block);
-        previous_block = block
-            .as_slice()
-            .try_into()
-            .expect("unexpected block length");
-        ciphertext.extend(block);
-    }
-
-    // let mut iter = bytes.chunks(BLOCK_SIZE).peekable();
-    // while let Some(chunk) = iter.next() {
-    //     let mut chunk: Vec<u8> = chunk.to_vec();
-    //     if iter.peek().is_none() {
-    //         // let padded = pkcs7pad(&chunk, BLOCK_SIZE);
-    //         chunk = pkcs7pad(&chunk, BLOCK_SIZE);
-    //     }
-    //     let message_block = fixed_xor(&previous_block, &chunk);
-    //     let mut block = GenericArray::<u8, U16>::clone_from_slice(&message_block);
-    //     cipher.encrypt_block(&mut block);
-    //     previous_block = block
-    //         .as_slice()
-    //         .try_into()
-    //         .expect("unexpected block length");
-    //     ciphertext.extend(block);
-    // }
     ciphertext
 }
 
@@ -243,14 +211,11 @@ fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-fn pkcs7pad(block: &[u8], length: usize) -> Vec<u8> {
-    let mut padded = Vec::from(block);
-    if block.len() == length {
-        padded.resize(length * 2, length as u8);
-    } else {
-        padded.resize(length, (length - block.len()) as u8);
-    }
-    padded
+fn pkcs7pad(bytes: &[u8]) -> Vec<u8> {
+    let padding_length = BLOCK_SIZE - (bytes.len() % BLOCK_SIZE);
+    let mut padded_bytes = bytes.to_vec();
+    padded_bytes.append(&mut vec![padding_length as u8; padding_length]);
+    padded_bytes
 }
 
 fn validate_pkcs7pad(plaintext: &[u8]) -> Result<Cow<[u8]>, &'static str> {
