@@ -27,7 +27,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 ## Set 3: Block & stream crypto
 
 17. [The CBC padding oracle](https://cryptopals.com/sets/3/challenges/17) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-17)) ([solution](https://github.com/staceytay/cryptopals/blob/ea593780b22ccd60a9741fb236999ed854434287/src/main.rs))
-18. [Implement CTR, the stream cipher mode](https://cryptopals.com/sets/3/challenges/18)
+18. [Implement CTR, the stream cipher mode](https://cryptopals.com/sets/3/challenges/18) ([solution](https://github.com/staceytay/cryptopals/blob/17a5e949644858e3d128478762c1591b787b925b/src/main.rs))
 19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19)
 20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20)
 21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21)
