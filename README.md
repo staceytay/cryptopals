@@ -28,7 +28,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 
 17. [The CBC padding oracle](https://cryptopals.com/sets/3/challenges/17) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-17)) ([solution](https://github.com/staceytay/cryptopals/blob/ea593780b22ccd60a9741fb236999ed854434287/src/main.rs))
 18. [Implement CTR, the stream cipher mode](https://cryptopals.com/sets/3/challenges/18) ([solution](https://github.com/staceytay/cryptopals/blob/17a5e949644858e3d128478762c1591b787b925b/src/main.rs))
-19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19)
+19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-19)) ([solution](https://github.com/staceytay/cryptopals/blob/aacfb548c0c8c33584000d0178a292c753872ca2/src/main.rs))
 20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20)
 21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21)
 22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22)
@@ -108,3 +108,17 @@ is fixed makes the problem much more tractable. Solution sketch:
 #### References
 1. https://robertheaton.com/2013/07/29/padding-oracle-attack/
 2. https://research.nccgroup.com/2021/02/17/cryptopals-exploiting-cbc-padding-oracles/
+
+### Set 3 Challenge 19
+
+At first I wasn't quite sure what attacking the cryptosystem piecemeal meant. My
+initial thought was to use a statistical approach that's much closer to what
+Challenge 20 is expecting. But, I did find a
+[writeup](https://out-of-cheese-error.netlify.app/cryptopals-set-3#Challenge-19:-Break-fixed-nonce-CTR-mode-using-substitutions)
+to this challenge that quite nicely (and interactively) solves the challenge. I
+didn't exactly follow this approach, since it wasn't as easy to interactively
+decipher the text using a compiled language without a repl, and I ended up with
+a solution that's closer to what I did to breaking repeating XOR in Challenge 6.
+I did have to iterate on the solution a number of times, especially tweaking the
+acceptable ascii characters in the if-condition, in order to maximize the number
+of columns decrypted.
