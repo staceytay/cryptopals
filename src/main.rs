@@ -13,6 +13,7 @@ const TEXT: &'static str = include_str!("../19.txt");
 fn main() {
     let key = generate_random_bytes(KEY_LENGTH);
 
+    // Decode strings from base64.
     let mut ciphertexts = Vec::new();
     for line in TEXT.split("\n") {
         let decoded = general_purpose::STANDARD.decode(line).unwrap();
@@ -20,8 +21,9 @@ fn main() {
         ciphertexts.push(ciphertext);
     }
 
+    // Attempt to break the ciphertexts for the first `min_length` characters of
+    // each ciphertext.
     let min_length = ciphertexts.iter().map(Vec::len).min().unwrap();
-
     let mut predicted_keystream = vec![None; min_length];
     for i in 0..min_length {
         for char in u8::MIN..=u8::MAX {
@@ -31,6 +33,9 @@ fn main() {
                 plaintext_column[j] = ciphertext[i] ^ guess;
             }
 
+            // If the plaintext produced by the predicted keystream byte
+            // produces no odd symbols or characters, then we know that we're
+            // onto something.
             if plaintext_column.iter().all(|b| {
                 *b == b' '
                     || *b == b','
