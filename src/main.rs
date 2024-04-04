@@ -4,20 +4,59 @@ use aes::cipher::{
 };
 use aes::Aes128;
 use base64::{engine::general_purpose, Engine as _};
+use rand::Rng;
 
 const BLOCK_SIZE: usize = 16;
+const KEY_LENGTH: usize = 16;
+const TEXT: &'static str = include_str!("../19.txt");
 
 fn main() {
-    let hex =
-        String::from("L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==");
-    let ciphertext = general_purpose::STANDARD.decode(hex).unwrap();
-    let plaintext = ctr(0, b"YELLOW SUBMARINE", &ciphertext);
+    let key = generate_random_bytes(KEY_LENGTH);
 
-    assert_eq!(&ciphertext, &ctr(0, b"YELLOW SUBMARINE", &plaintext));
+    let mut ciphertexts = Vec::new();
+    for line in TEXT.split("\n") {
+        let decoded = general_purpose::STANDARD.decode(line).unwrap();
+        let ciphertext = ctr(0, &key, &decoded);
+        ciphertexts.push(ciphertext);
+    }
 
-    println!("{:-^64}", "PLAINTEXT");
-    println!("{}", String::from_utf8(plaintext).unwrap());
-    println!("{:-^64}", "END");
+    let min_length = ciphertexts.iter().map(Vec::len).min().unwrap();
+
+    let mut predicted_keystream = vec![None; min_length];
+    for i in 0..min_length {
+        for char in u8::MIN..=u8::MAX {
+            let guess = char ^ ciphertexts[0][i];
+            let mut plaintext_column = vec![0u8; ciphertexts.len()];
+            for (j, ciphertext) in ciphertexts.iter().enumerate() {
+                plaintext_column[j] = ciphertext[i] ^ guess;
+            }
+
+            if plaintext_column.iter().all(|b| {
+                *b == b' '
+                    || *b == b','
+                    || *b == b'-'
+                    || *b == b'.'
+                    || *b >= b'a' && *b <= b'z'
+                    || *b >= b'A' && *b <= b'Z'
+            }) {
+                predicted_keystream[i] = Some(guess);
+                break;
+            }
+        }
+    }
+
+    for (i, ciphertext) in ciphertexts.iter().enumerate() {
+        let plaintext = ciphertext
+            .iter()
+            .take(min_length)
+            .enumerate()
+            .map(|(i, b)| match predicted_keystream[i] {
+                None => b'_',
+                Some(p) => *b ^ p,
+            })
+            .collect();
+        println!("{:0>2}: {}", i, String::from_utf8(plaintext).unwrap(),);
+    }
 }
 
 fn ctr(nonce: u64, key: &[u8], bytes: &[u8]) -> Vec<u8> {
@@ -46,4 +85,13 @@ fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
         .zip(b2.into_iter())
         .map(|(u1, u2)| u1 ^ u2)
         .collect()
+}
+
+fn generate_random_bytes(length: usize) -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    let mut v = Vec::new();
+    for _ in 0..length {
+        v.push(rng.gen::<u8>());
+    }
+    v
 }
