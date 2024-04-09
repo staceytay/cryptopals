@@ -29,7 +29,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 17. [The CBC padding oracle](https://cryptopals.com/sets/3/challenges/17) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-17)) ([solution](https://github.com/staceytay/cryptopals/blob/ea593780b22ccd60a9741fb236999ed854434287/src/main.rs))
 18. [Implement CTR, the stream cipher mode](https://cryptopals.com/sets/3/challenges/18) ([solution](https://github.com/staceytay/cryptopals/blob/17a5e949644858e3d128478762c1591b787b925b/src/main.rs))
 19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-19)) ([solution](https://github.com/staceytay/cryptopals/blob/aacfb548c0c8c33584000d0178a292c753872ca2/src/main.rs))
-20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20)
+20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-20)) ([solution](https://github.com/staceytay/cryptopals/blob/b6ee4e9fc7c0d8101ec4cbe15919cb8ad5f02bdf/src/main.rs))
 21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21)
 22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22)
 23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23)
@@ -122,3 +122,10 @@ a solution that's closer to what I did to breaking repeating XOR in Challenge 6.
 I did have to iterate on the solution a number of times, especially tweaking the
 acceptable ascii characters in the if-condition, in order to maximize the number
 of columns decrypted.
+
+### Set 3 Challenge 20
+
+The solution to this is quite similar to the previous solution, except that
+instead of requiring _all_ the characters in `plaintext_column` to be mostly
+letters of the alphabet and certain accepted symbols, we simply choose the byte
+that'll result in the the most number of letters when XOR-ed.
