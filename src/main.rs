@@ -5,7 +5,6 @@ use aes::cipher::{
 use aes::Aes128;
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
-use std::collections::HashMap;
 
 const BLOCK_SIZE: usize = 16;
 const KEY_LENGTH: usize = 16;
@@ -27,10 +26,13 @@ fn main() {
     let min_length = ciphertexts.iter().map(Vec::len).min().unwrap();
     let mut predicted_keystream = vec![None; min_length];
     for i in 0..min_length {
-        // Store our best guess at which key is the one. First value is the sum
-        // of occurences of the letters of the alphabet (in both lower and
-        // uppercase) and the space char. Second value is the corresponding key.
-        let mut best_guess = (0.0, 0);
+        // Find the best byte for position i in our `predicted_keystream`.
+        // "Best" here is a heuristic that counts the frequency of each
+        // "meaningful" ASCII char appearing in column i of the plaintext, based
+        // on XOR-ing with our `best_guess` byte. So a `best_guess` byte that
+        // produces the most number of aphabetical letters would be deemed the
+        // likeliest value for `predicted_keystream[i]`.
+        let mut best_guess = (0, 0);
         for char in u8::MIN..=u8::MAX {
             let guess = char ^ ciphertexts[0][i];
             let mut plaintext_column = vec![0u8; ciphertexts.len()];
@@ -38,28 +40,17 @@ fn main() {
                 plaintext_column[j] = ciphertext[i] ^ guess;
             }
 
-            // Count freq of each ASCII char appearing.
-            let mut freq = HashMap::new();
+            // Count frequency of each "meaningful" ASCII char appearing.
+            let mut sum_occurences = 0;
             for b in plaintext_column.iter() {
-                *freq.entry(b).or_insert(0.0) += 1.0;
-            }
-
-            let mut sum_occurences = 0.0;
-            // TODO: cleanup this part, maybe .concat all the possbile values for b?
-            for b in 32..=122 {
-                // If i is either the space char or a letter of the
-                // alphabet(-ish).
-                if b == b' '
-                    || b == b','
-                    || b == b'-'
-                    || b == b'.'
-                    || b >= b'a' && b <= b'z'
-                    || b >= b'A' && b <= b'Z'
+                if *b == b' '
+                    || *b == b','
+                    || *b == b'-'
+                    || *b == b'.'
+                    || *b >= b'a' && *b <= b'z'
+                    || *b >= b'A' && *b <= b'Z'
                 {
-                    match freq.get(&b) {
-                        Some(v) => sum_occurences += v,
-                        None => (),
-                    }
+                    sum_occurences += 1;
                 }
             }
 
