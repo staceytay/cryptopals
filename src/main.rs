@@ -1,12 +1,39 @@
+use rand::Rng;
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 const N: usize = 624;
 const M: usize = 397;
 
 fn main() {
-    let seed = 1712697037;
-    println!("seed = {seed}");
-    let mut rand = MT19937::new(seed);
-    for _ in 0..128 {
-        println!("{}", rand.gen());
+    thread::sleep(Duration::from_secs(rand::thread_rng().gen_range(40..=1000)));
+
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut rand = MT19937::new(seed as u32);
+    let output = rand.gen();
+
+    thread::sleep(Duration::from_secs(rand::thread_rng().gen_range(40..=1000)));
+
+    let mut guess = None;
+    let unix_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    for i in 40..=1000 {
+        let seed = unix_time as u32 - i;
+        let mut rand = MT19937::new(seed);
+        if rand.gen() == output {
+            guess = Some(seed);
+            break;
+        }
+    }
+
+    match guess {
+        None => println!("Seed not found"),
+        Some(x) => println!("Seed found: {x}"),
     }
 }
 
