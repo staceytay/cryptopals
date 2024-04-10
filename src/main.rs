@@ -4,20 +4,10 @@ const M: usize = 397;
 fn main() {
     let seed = 1712697037;
     println!("seed = {seed}");
-    let mut rand = mt19937(seed);
+    let mut rand = MT19937::new(seed);
     for _ in 0..128 {
         println!("{}", rand.gen());
     }
-}
-
-fn mt19937(seed: u32) -> MT19937 {
-    let mut state = [0; N];
-    state[0] = seed;
-    for i in 1..N {
-        state[i] = (1812433253 * (state[i - 1] ^ state[i - 1] >> 30) as u64 + i as u64) as u32;
-    }
-
-    MT19937 { index: N, state }
 }
 
 struct MT19937 {
@@ -26,6 +16,16 @@ struct MT19937 {
 }
 
 impl MT19937 {
+    fn new(seed: u32) -> MT19937 {
+        let mut state = [0; N];
+        state[0] = seed;
+        for i in 1..N {
+            state[i] = (1812433253 * (state[i - 1] ^ state[i - 1] >> 30) as u64 + i as u64) as u32;
+        }
+
+        MT19937 { index: N, state }
+    }
+
     fn gen(&mut self) -> u32 {
         if self.index >= N {
             for i in 0..N {
