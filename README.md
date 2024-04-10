@@ -30,7 +30,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 18. [Implement CTR, the stream cipher mode](https://cryptopals.com/sets/3/challenges/18) ([solution](https://github.com/staceytay/cryptopals/blob/17a5e949644858e3d128478762c1591b787b925b/src/main.rs))
 19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-19)) ([solution](https://github.com/staceytay/cryptopals/blob/aacfb548c0c8c33584000d0178a292c753872ca2/src/main.rs))
 20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-20)) ([solution](https://github.com/staceytay/cryptopals/blob/b6ee4e9fc7c0d8101ec4cbe15919cb8ad5f02bdf/src/main.rs))
-21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21)
+21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-21)) ([solution](https://github.com/staceytay/cryptopals/blob/a4087ae5d9afa7b3581e796e49b22ff040d23035/src/main.rs))
 22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22)
 23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23)
 24. [Create the MT19937 stream cipher and break it](https://cryptopals.com/sets/3/challenges/24)
@@ -129,3 +129,10 @@ The solution to this is quite similar to the previous solution, except that
 instead of requiring _all_ the characters in `plaintext_column` to be mostly
 letters of the alphabet and certain accepted symbols, we simply choose the byte
 that'll result in the the most number of letters when XOR-ed.
+
+### Set 3 Challenge 21
+
+#### References
+1. https://github.com/bmurray7/mersenne-twister-examples/blob/master/python-mersenne-twister.py
+2. http://www.math.sci.hiroshima-u.ac.jp/m-mat/MT/MT2002/emt19937ar.html
+3. https://rust-random.github.io/book/guide-rngs.html
