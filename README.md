@@ -31,7 +31,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 19. [Break fixed-nonce CTR mode using substitutions](https://cryptopals.com/sets/3/challenges/19) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-19)) ([solution](https://github.com/staceytay/cryptopals/blob/aacfb548c0c8c33584000d0178a292c753872ca2/src/main.rs))
 20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-20)) ([solution](https://github.com/staceytay/cryptopals/blob/b6ee4e9fc7c0d8101ec4cbe15919cb8ad5f02bdf/src/main.rs))
 21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-21)) ([solution](https://github.com/staceytay/cryptopals/blob/a4087ae5d9afa7b3581e796e49b22ff040d23035/src/main.rs))
-22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22)
+22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22) ([solution](https://github.com/staceytay/cryptopals/blob/cfdbb9fdab449550f356c2ee359d5bae0d4d3f45/src/main.rs))
 23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23)
 24. [Create the MT19937 stream cipher and break it](https://cryptopals.com/sets/3/challenges/24)
 
