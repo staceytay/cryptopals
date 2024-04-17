@@ -32,7 +32,7 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 20. [Break fixed-nonce CTR statistically](https://cryptopals.com/sets/3/challenges/20) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-20)) ([solution](https://github.com/staceytay/cryptopals/blob/b6ee4e9fc7c0d8101ec4cbe15919cb8ad5f02bdf/src/main.rs))
 21. [Implement the MT19937 Mersenne Twister RNG](https://cryptopals.com/sets/3/challenges/21) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-21)) ([solution](https://github.com/staceytay/cryptopals/blob/a4087ae5d9afa7b3581e796e49b22ff040d23035/src/main.rs))
 22. [Crack an MT19937 seed](https://cryptopals.com/sets/3/challenges/22) ([solution](https://github.com/staceytay/cryptopals/blob/cfdbb9fdab449550f356c2ee359d5bae0d4d3f45/src/main.rs))
-23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23)
+23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-23)) ([solution](https://github.com/staceytay/cryptopals/blob/4b99af2a9c2fc96da658ce9cbdf2aa994b62f36a/src/main.rs))
 24. [Create the MT19937 stream cipher and break it](https://cryptopals.com/sets/3/challenges/24)
 
 ## Notes (spoiler alert!)
@@ -136,3 +136,15 @@ that'll result in the the most number of letters when XOR-ed.
 1. https://github.com/bmurray7/mersenne-twister-examples/blob/master/python-mersenne-twister.py
 2. http://www.math.sci.hiroshima-u.ac.jp/m-mat/MT/MT2002/emt19937ar.html
 3. https://rust-random.github.io/book/guide-rngs.html
+
+### Set 3 Challenge 23
+
+An initial confusion for me was that to recover `y` in `x = y ^ y >> l`, `y = x
+^ x >> l`. This assumes that `l > (w - l)`, where `w` is the word size (32 in
+this case).
+
+#### References
+1. https://occasionallycogent.com/inverting_the_mersenne_temper/index.html
+2. https://gist.github.com/Rhomboid/b1a882c70b7a1901efa9
+3. https://www.maths.tcd.ie/~fionn/misc/mt/
+4. https://nayak.io/posts/mersenne_twister/
