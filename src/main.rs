@@ -1,50 +1,98 @@
+use rand::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 const N: usize = 624;
 const M: usize = 397;
 
 fn main() {
-    let mut rand0 = MT19937::new(rand::random::<u32>());
+    // Use and verify MT19937 stream cipher.
+    let seed = rand::random::<u16>();
+    let plaintext = b"Create the MT19937 stream cipher and break it";
+    assert_eq!(
+        plaintext.to_vec(),
+        stream_cipher(seed, &stream_cipher(seed, plaintext))
+    );
 
-    // Clone rand0's state.
-    let mut state = [0; N];
-    for i in 0..N {
-        state[i] = untemper(rand0.gen());
+    // Recover the "key" from a MT19937 stream cipher encrypted text, assuming
+    // we know something of the plaintext. In this case, the plaintext ends with
+    // 14 consecutive 'A' characters.
+    let known_plaintext = [
+        generate_random_bytes(rand::thread_rng().gen_range(0..128)),
+        b"AAAAAAAAAAAAAA".to_vec(),
+    ]
+    .concat();
+    let ciphertext = stream_cipher(seed, &known_plaintext);
+    for i in u16::MIN..u16::MAX {
+        let message = stream_cipher(i, &ciphertext);
+        if &message[message.len() - 14..] == b"AAAAAAAAAAAAAA" {
+            assert_eq!(seed, i);
+            break;
+        }
     }
-    let mut rand1 = MT19937::splice(state);
 
-    // Check that the spliced generator rand1 predicts the output of rand0.
-    for _ in 0..4096 {
-        assert_eq!(rand0.gen(), rand1.gen());
-    }
+    // Generate a password reset token using MT19937 seeded from the current
+    // time and check if token is from MT19937 PRNG seeded with the current time
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let token = generate_password_reset_token(seed as u32);
+    assert!(mt19937prng_password(&token));
+    let token = generate_random_bytes(128);
+    assert!(!mt19937prng_password(&token));
 }
 
-// Referenced from
-// https://gist.github.com/Rhomboid/b1a882c70b7a1901efa9#file-mersenne_predict-py-L77.
-fn untemper(x: u32) -> u32 {
-    fn undo_xor_rshift(x: u32, shift: usize) -> u32 {
-        // Reverses the operation x ^= (x >> shift).
-        let mut result = x;
-        for shift_amount in (shift..32).step_by(shift) {
-            result ^= x >> shift_amount;
-        }
-        result
-    }
+fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
+    b1.into_iter()
+        .zip(b2.into_iter())
+        .map(|(u1, u2)| u1 ^ u2)
+        .collect()
+}
 
-    fn undo_xor_lshiftmask(mut x: u32, shift: usize, mask: u32) -> u32 {
-        // Reverses the operation x ^= ((x << shift) & mask).
-        let mut window = (1 << shift) - 1;
-        for _ in 0..(32 / shift) {
-            x ^= ((window & x) << shift) & mask;
-            window <<= shift;
+fn generate_password_reset_token(seed: u32) -> Vec<u8> {
+    let mut rand = MT19937::new(seed);
+    let mut v = Vec::new();
+    for _ in 0..128 {
+        for b in rand.gen().to_ne_bytes() {
+            v.push(b);
         }
-        x
     }
+    v
+}
 
-    let mut y = x;
-    y = undo_xor_rshift(y, 18);
-    y = undo_xor_lshiftmask(y, 15, 4022730752);
-    y = undo_xor_lshiftmask(y, 7, 2636928640);
-    y = undo_xor_rshift(y, 11);
-    y
+fn generate_random_bytes(length: usize) -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    let mut v = Vec::new();
+    for _ in 0..length {
+        v.push(rng.gen::<u8>());
+    }
+    v
+}
+
+fn mt19937prng_password(token: &[u8]) -> bool {
+    let unix_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    for i in 0..128 {
+        let seed = unix_time as u32 - i;
+        let guess = generate_password_reset_token(seed);
+        if guess == token {
+            return true;
+        }
+    }
+    false
+}
+
+fn stream_cipher(seed: u16, bytes: &[u8]) -> Vec<u8> {
+    let mut rand = MT19937::new(seed as u32);
+    let mut message = Vec::new();
+
+    let mut iter = bytes.chunks((u32::BITS / u8::BITS) as usize);
+    while let Some(chunk) = iter.next() {
+        message.extend(fixed_xor(&chunk, &rand.gen().to_ne_bytes()));
+    }
+    message
 }
 
 struct MT19937 {
@@ -60,10 +108,6 @@ impl MT19937 {
             state[i] = (1812433253 * (state[i - 1] ^ state[i - 1] >> 30) as u64 + i as u64) as u32;
         }
 
-        MT19937 { index: N, state }
-    }
-
-    fn splice(state: [u32; N]) -> MT19937 {
         MT19937 { index: N, state }
     }
 
