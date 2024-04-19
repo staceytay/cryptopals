@@ -35,6 +35,17 @@ An ongoing attempt at solving the [cryptopals crypto challenges](https://cryptop
 23. [Clone an MT19937 RNG from its output](https://cryptopals.com/sets/3/challenges/23) ([notes](https://github.com/staceytay/cryptopals#set-3-challenge-23)) ([solution](https://github.com/staceytay/cryptopals/blob/4b99af2a9c2fc96da658ce9cbdf2aa994b62f36a/src/main.rs))
 24. [Create the MT19937 stream cipher and break it](https://cryptopals.com/sets/3/challenges/24) ([solution](https://github.com/staceytay/cryptopals/blob/da9b07edf19ecf0c5a89c68bd68e654a857ff042/src/main.rs))
 
+## Set 4: Stream crypto and randomness
+
+25. [Break "random access read/write" AES CTR](https://cryptopals.com/sets/4/challenges/25) ([solution](https://github.com/staceytay/cryptopals/blob/a33017ba66eb710d605535c957cb2f8617ee1db5/src/main.rs))
+26. [CTR bitflipping](https://cryptopals.com/sets/4/challenges/26)
+27. [Recover the key from CBC with IV=Key](https://cryptopals.com/sets/4/challenges/27)
+28. [Implement a SHA-1 keyed MAC](https://cryptopals.com/sets/4/challenges/28)
+29. [Break a SHA-1 keyed MAC using length extension](https://cryptopals.com/sets/4/challenges/29)
+30. [Break an MD4 keyed MAC using length extension](https://cryptopals.com/sets/4/challenges/30)
+31. [Implement and break HMAC-SHA1 with an artificial timing leak](https://cryptopals.com/sets/4/challenges/31)
+32. [Break HMAC-SHA1 with a slightly less artificial timing leak](https://cryptopals.com/sets/4/challenges/32)
+
 ## Notes (spoiler alert!)
 
 ### Set 2 Challenge 13
