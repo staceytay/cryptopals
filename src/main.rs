@@ -1,45 +1,74 @@
+use aes::cipher::{
+    generic_array::{typenum::U16, GenericArray},
+    BlockEncrypt, KeyInit,
+};
+use aes::Aes128;
+use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-const N: usize = 624;
-const M: usize = 397;
+const BLOCK_SIZE: usize = 16;
+const KEY_LENGTH: usize = 16;
+const TEXT: &'static str = include_str!("../19.txt");
 
 fn main() {
-    // Use and verify MT19937 stream cipher.
-    let seed = rand::random::<u16>();
-    let plaintext = b"Create the MT19937 stream cipher and break it";
-    assert_eq!(
-        plaintext.to_vec(),
-        stream_cipher(seed, &stream_cipher(seed, plaintext))
-    );
+    let oracle = Oracle::new(0);
 
-    // Recover the "key" from a MT19937 stream cipher encrypted text, assuming
-    // we know something of the plaintext. In this case, the plaintext ends with
-    // 14 consecutive 'A' characters.
-    let known_plaintext = [
-        generate_random_bytes(rand::thread_rng().gen_range(0..128)),
-        b"AAAAAAAAAAAAAA".to_vec(),
-    ]
-    .concat();
-    let ciphertext = stream_cipher(seed, &known_plaintext);
-    for i in u16::MIN..u16::MAX {
-        let message = stream_cipher(i, &ciphertext);
-        if &message[message.len() - 14..] == b"AAAAAAAAAAAAAA" {
-            assert_eq!(seed, i);
-            break;
+    // Decode strings from base64.
+    let mut ciphertexts = Vec::new();
+    for line in TEXT.split("\n") {
+        let decoded = general_purpose::STANDARD.decode(line).unwrap();
+        let ciphertext = oracle.ctr(&decoded);
+        ciphertexts.push(ciphertext);
+    }
+
+    // Recover plaintext from edit function.
+    for (i, ciphertext) in ciphertexts.iter().enumerate() {
+        let plaintext = oracle.edit(ciphertext, 0, ciphertext);
+        println!("{:0>2}: {}", i + 1, String::from_utf8_lossy(&plaintext));
+    }
+}
+
+struct Oracle {
+    key: Vec<u8>,
+    nonce: usize,
+}
+
+impl Oracle {
+    fn new(nonce: usize) -> Oracle {
+        Oracle {
+            key: generate_random_bytes(KEY_LENGTH),
+            nonce,
         }
     }
 
-    // Generate a password reset token using MT19937 seeded from the current
-    // time and check if token is from MT19937 PRNG seeded with the current time
-    let seed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let token = generate_password_reset_token(seed as u32);
-    assert!(mt19937prng_password(&token));
-    let token = generate_random_bytes(128);
-    assert!(!mt19937prng_password(&token));
+    fn ctr(&self, bytes: &[u8]) -> Vec<u8> {
+        let key = GenericArray::<u8, U16>::clone_from_slice(&self.key);
+        let cipher = Aes128::new(&key);
+
+        let mut count = 0u64;
+        let mut input_block = [self.nonce.to_le_bytes(), count.to_le_bytes()].concat();
+        let mut message = Vec::new();
+
+        let mut iter = bytes.chunks(BLOCK_SIZE);
+        while let Some(chunk) = iter.next() {
+            let mut block = GenericArray::<u8, U16>::clone_from_slice(&input_block);
+            cipher.encrypt_block(&mut block);
+
+            message.extend(fixed_xor(&block, &chunk));
+
+            count += 1;
+            input_block = [self.nonce.to_le_bytes(), count.to_le_bytes()].concat();
+        }
+        message
+    }
+
+    fn edit(&self, ciphertext: &[u8], offset: usize, newtext: &[u8]) -> Vec<u8> {
+        let mut plaintext = self.ctr(ciphertext);
+        for (i, b) in newtext.iter().enumerate() {
+            plaintext[offset + i] = *b;
+        }
+        self.ctr(&plaintext)
+    }
 }
 
 fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
@@ -49,17 +78,6 @@ fn fixed_xor(b1: &[u8], b2: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-fn generate_password_reset_token(seed: u32) -> Vec<u8> {
-    let mut rand = MT19937::new(seed);
-    let mut v = Vec::new();
-    for _ in 0..128 {
-        for b in rand.gen().to_ne_bytes() {
-            v.push(b);
-        }
-    }
-    v
-}
-
 fn generate_random_bytes(length: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let mut v = Vec::new();
@@ -67,71 +85,4 @@ fn generate_random_bytes(length: usize) -> Vec<u8> {
         v.push(rng.gen::<u8>());
     }
     v
-}
-
-fn mt19937prng_password(token: &[u8]) -> bool {
-    let unix_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    for i in 0..128 {
-        let seed = unix_time as u32 - i;
-        let guess = generate_password_reset_token(seed);
-        if guess == token {
-            return true;
-        }
-    }
-    false
-}
-
-fn stream_cipher(seed: u16, bytes: &[u8]) -> Vec<u8> {
-    let mut rand = MT19937::new(seed as u32);
-    let mut message = Vec::new();
-
-    let mut iter = bytes.chunks((u32::BITS / u8::BITS) as usize);
-    while let Some(chunk) = iter.next() {
-        message.extend(fixed_xor(&chunk, &rand.gen().to_ne_bytes()));
-    }
-    message
-}
-
-struct MT19937 {
-    index: usize,
-    state: [u32; N],
-}
-
-impl MT19937 {
-    fn new(seed: u32) -> MT19937 {
-        let mut state = [0; N];
-        state[0] = seed;
-        for i in 1..N {
-            state[i] = (1812433253 * (state[i - 1] ^ state[i - 1] >> 30) as u64 + i as u64) as u32;
-        }
-
-        MT19937 { index: N, state }
-    }
-
-    fn gen(&mut self) -> u32 {
-        if self.index >= N {
-            for i in 0..N {
-                let y = (self.state[i] & 0x80000000) + (self.state[(i + 1) % 624] & 0x7FFFFFFF);
-                self.state[i] = self.state[(i + M) % N] ^ y >> 1;
-
-                if y % 2 != 0 {
-                    self.state[i] = self.state[i] ^ 0x9908B0DF
-                }
-            }
-            self.index = 0;
-        }
-
-        let mut y = self.state[self.index];
-        y = y ^ y >> 11;
-        y = y ^ y << 7 & 2636928640;
-        y = y ^ y << 15 & 4022730752;
-        y = y ^ y >> 18;
-
-        self.index = self.index + 1;
-
-        y
-    }
 }
